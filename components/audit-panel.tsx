@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { getCurrentUser } from "@/lib/auth"
 import { getProductionData, getCrews, getTypes, removeProductionEntry, updateProductionEntry } from "@/lib/storage"
 import type { ProductionEntry, CrewData, TypeData } from "@/lib/types"
-import { Pencil, Trash2, Search, Filter, AlertCircle } from "lucide-react"
+import { Pencil, Trash2, Search, Filter, AlertCircle, Info } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { dateToDbString, dbStringToDate, formatDateForDisplay } from "@/lib/utils"
+import { subDays } from "date-fns"
 
 export default function AuditPanel() {
   const router = useRouter()
@@ -49,6 +50,8 @@ export default function AuditPanel() {
   const [filterType, setFilterType] = useState<string>("all")
   const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(undefined)
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>(undefined)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [thirtyDaysAgo, setThirtyDaysAgo] = useState<Date>(subDays(new Date(), 30))
 
   // Edit dialog state
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -73,23 +76,21 @@ export default function AuditPanel() {
         return
       }
 
-      if (currentUser.role !== "admin") {
-        toast({
-          title: "Access denied",
-          description: "You don't have permission to access this page",
-          variant: "destructive",
-        })
-        router.push("/")
-        return
-      }
-
       try {
         const [productionData, crewData, typeData] = await Promise.all([getProductionData(), getCrews(), getTypes()])
 
-        setEntries(productionData)
-        setFilteredEntries(productionData)
+        // Si no es admin, filtrar solo los registros creados por el usuario actual
+        const filteredByPermission =
+          currentUser.role === "admin"
+            ? productionData
+            : productionData.filter((entry) => entry.username === currentUser.username)
+
+        setEntries(filteredByPermission)
+        setFilteredEntries(filteredByPermission)
         setCrews(crewData)
         setTypes(typeData)
+        setCurrentUser(currentUser)
+        setThirtyDaysAgo(subDays(new Date(), 30))
       } catch (error) {
         console.error("Error loading audit data:", error)
         toast({
@@ -150,6 +151,21 @@ export default function AuditPanel() {
     setFilteredEntries(filtered)
   }, [entries, searchTerm, filterCrew, filterType, filterDateFrom, filterDateTo])
 
+  // Función para verificar si un usuario puede editar/eliminar un registro
+  const canEditEntry = (entry: ProductionEntry): boolean => {
+    // Administradores pueden editar cualquier registro
+    if (currentUser?.role === "admin") return true
+
+    // Usuarios no administradores solo pueden editar sus propios registros
+    if (entry.username !== currentUser?.username) return false
+
+    // Y solo si están dentro de los últimos 30 días
+    const entryDate = dbStringToDate(entry.date)
+    if (!entryDate) return false
+
+    return entryDate >= thirtyDaysAgo
+  }
+
   const handleEdit = (entry: ProductionEntry) => {
     setEditEntry(entry)
     try {
@@ -204,7 +220,14 @@ export default function AuditPanel() {
 
         // Refresh the entries list
         const updatedEntries = await getProductionData()
-        setEntries(updatedEntries)
+
+        // Filtrar según permisos del usuario
+        const filteredByPermission =
+          currentUser.role === "admin"
+            ? updatedEntries
+            : updatedEntries.filter((entry) => entry.username === currentUser.username)
+
+        setEntries(filteredByPermission)
         setIsEditDialogOpen(false)
       } else {
         setEditError("Failed to update entry")
@@ -238,7 +261,14 @@ export default function AuditPanel() {
 
         // Refresh the entries list
         const updatedEntries = await getProductionData()
-        setEntries(updatedEntries)
+
+        // Filtrar según permisos del usuario
+        const filteredByPermission =
+          currentUser.role === "admin"
+            ? updatedEntries
+            : updatedEntries.filter((entry) => entry.username === currentUser.username)
+
+        setEntries(filteredByPermission)
         setIsDeleteDialogOpen(false)
       } else {
         toast({
@@ -284,10 +314,23 @@ export default function AuditPanel() {
           </div>
           <div className="text-center md:text-right">
             <h1 className="text-4xl font-bold mb-2">Production Audit</h1>
-            <p className="text-xl">Review, edit, and manage production entries</p>
+            {currentUser?.role === "admin" ? (
+              <p className="text-xl">Review, edit, and manage all production entries</p>
+            ) : (
+              <p className="text-xl">Review and manage your production entries</p>
+            )}
           </div>
         </div>
       </div>
+
+      {currentUser?.role !== "admin" && (
+        <Alert className="mb-6">
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            You can edit or delete your entries that are less than 30 days old. Older entries cannot be modified.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Card className="mb-6">
         <CardHeader>
@@ -503,24 +546,28 @@ export default function AuditPanel() {
                       <TableCell className="text-base">{entry.feet.toLocaleString()} ft</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(entry)}
-                            className="text-primary hover:text-primary/90"
-                          >
-                            <Pencil className="h-4 w-4" />
-                            <span className="sr-only">Edit</span>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => confirmDelete(entry.id!)}
-                            className="text-destructive hover:text-destructive/90"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
+                          {canEditEntry(entry) && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEdit(entry)}
+                                className="text-primary hover:text-primary/90"
+                              >
+                                <Pencil className="h-4 w-4" />
+                                <span className="sr-only">Edit</span>
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => confirmDelete(entry.id!)}
+                                className="text-destructive hover:text-destructive/90"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                <span className="sr-only">Delete</span>
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

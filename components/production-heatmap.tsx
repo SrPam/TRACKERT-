@@ -4,7 +4,8 @@ import { useEffect, useRef } from "react"
 import { useTheme } from "next-themes"
 import { Chart, registerables } from "chart.js"
 import type { ProductionEntry } from "@/lib/types"
-import { parseISO, getDay } from "date-fns"
+import { getDay } from "date-fns"
+import { dbStringToDate } from "@/lib/utils"
 
 Chart.register(...registerables)
 
@@ -45,7 +46,12 @@ export function ProductionHeatmap({ data }: ProductionHeatmapProps) {
 
     // Fill data
     data.forEach((entry) => {
-      const date = parseISO(entry.date)
+      // Replace parseISO with our custom dbStringToDate function
+      const date = dbStringToDate(entry.date)
+
+      // Skip invalid dates
+      if (!date) return
+
       const dayIndex = getDay(date)
       const dayName = daysOfWeek[dayIndex === 0 ? 6 : dayIndex - 1] // Adjust for Sunday
 

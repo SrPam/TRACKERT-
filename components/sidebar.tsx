@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import { Settings, PlusCircle, Menu, X, Home, Users, LogOut, ClipboardList } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -95,40 +94,41 @@ export default function Sidebar() {
                 New Entry
               </Button>
             </Link>
+            <>
+              <Link href="/audit" onClick={() => setIsOpen(false)}>
+                <Button
+                  variant={pathname === "/audit" ? "default" : "ghost"}
+                  className="w-full justify-start h-10 text-sm"
+                >
+                  <ClipboardList className="mr-2 h-4 w-4" />
+                  Audit Production
+                </Button>
+              </Link>
 
-            {currentUser.role === "admin" && (
-              <>
-                <Link href="/audit" onClick={() => setIsOpen(false)}>
-                  <Button
-                    variant={pathname === "/audit" ? "default" : "ghost"}
-                    className="w-full justify-start h-10 text-sm"
-                  >
-                    <ClipboardList className="mr-2 h-4 w-4" />
-                    Audit Production
-                  </Button>
-                </Link>
+              {currentUser.role === "admin" && (
+                <>
+                  <Link href="/settings" onClick={() => setIsOpen(false)}>
+                    <Button
+                      variant={pathname === "/settings" ? "default" : "ghost"}
+                      className="w-full justify-start h-10 text-sm"
+                    >
+                      <Settings className="mr-2 w-4 h-4" />
+                      Settings
+                    </Button>
+                  </Link>
 
-                <Link href="/settings" onClick={() => setIsOpen(false)}>
-                  <Button
-                    variant={pathname === "/settings" ? "default" : "ghost"}
-                    className="w-full justify-start h-10 text-sm"
-                  >
-                    <Settings className="mr-2 w-4 h-4" />
-                    Settings
-                  </Button>
-                </Link>
-
-                <Link href="/users" onClick={() => setIsOpen(false)}>
-                  <Button
-                    variant={pathname === "/users" ? "default" : "ghost"}
-                    className="w-full justify-start h-10 text-sm"
-                  >
-                    <Users className="mr-2 h-4 w-4" />
-                    User Management
-                  </Button>
-                </Link>
-              </>
-            )}
+                  <Link href="/users" onClick={() => setIsOpen(false)}>
+                    <Button
+                      variant={pathname === "/users" ? "default" : "ghost"}
+                      className="w-full justify-start h-10 text-sm"
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      User Management
+                    </Button>
+                  </Link>
+                </>
+              )}
+            </>
           </nav>
 
           <div className="p-2 border-t space-y-1">
